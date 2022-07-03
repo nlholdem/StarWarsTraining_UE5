@@ -26,6 +26,8 @@ void AStarWarsDrone::BeginPlay()
 void AStarWarsDrone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	FVector EnemyLocation =  Enemy->GetActorLocation();
+	FRotator EnemyRotation = Enemy->GetActorRotation();
 	FVector NewLocation = GetActorLocation();
 	FRotator NewRotation = GetActorRotation();
 	NewLocation.X += XController->update(-200.0, NewLocation.X, DeltaTime);
@@ -33,7 +35,8 @@ void AStarWarsDrone::Tick(float DeltaTime)
 	NewLocation.Z += ZController->update(90.0, NewLocation.Z, DeltaTime);
 	SetActorLocationAndRotation(NewLocation, NewRotation);
 
-	UE_LOG(LogTemp, Warning, TEXT("Droning..."))
+	UE_LOG(LogTemp, Warning, TEXT("Enemy location: %f %f %f"), EnemyLocation.X, EnemyLocation.Y, EnemyLocation.Z);
+	UE_LOG(LogTemp, Warning, TEXT("Tick"));
 
 }
 
