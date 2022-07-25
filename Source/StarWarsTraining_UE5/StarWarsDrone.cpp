@@ -31,13 +31,21 @@ void AStarWarsDrone::Tick(float DeltaTime)
 	FRotator EnemyRotation = Enemy->GetActorRotation();
 	FVector NewLocation = GetActorLocation();
 	FRotator NewRotation = GetActorRotation();
+
+	// getting the angle betweeen drone and gun
+	FVector d = NewLocation - EnemyLocation;
+	float a = atan2f(d.Y, d.X);
+	// now let's subtract the gun rotation
+	float drone_actor_angle = a - EnemyRotation.Yaw + 90;
+	// hopefully that's zero if the gun is pointing at the drone?
+
 	NewLocation.X += XController->update(-200.0, NewLocation.X, DeltaTime);
 	NewLocation.Y += YController->update(0.0, NewLocation.Y, DeltaTime);
 	NewLocation.Z += ZController->update(90.0, NewLocation.Z, DeltaTime);
+
 	SetActorLocationAndRotation(NewLocation, NewRotation);
 
 	UE_LOG(LogTemp, Warning, TEXT("Enemy location: %f %f %f"), EnemyLocation.X, EnemyLocation.Y, EnemyLocation.Z);
-	UE_LOG(LogTemp, Warning, TEXT("Tick"));
-
+	UE_LOG(LogTemp, Warning, TEXT("drone_actor_angle: %f"), drone_actor_angle);
 }
 
