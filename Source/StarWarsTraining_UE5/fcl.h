@@ -4,11 +4,20 @@
 #include "fcl/globals.h"
 #include "fcl/layer.h"
 #include "fcl/neuron.h"
+#include "fcl/bandpass.h"
+
+#include "Containers/Array.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <vector>
+
+#pragma once
+
+#include "CoreMinimal.h"
+
 
 /** Main class of Feedforward Closed Loop Learning.
  * Create an instance of this class to do the
@@ -28,129 +37,122 @@
 class FeedforwardClosedloopLearning {
 
 public:
-	
+
 	/** Constructor: FCL without any filters
 	 * \param num_of_inputs Number of inputs in the input layer
 	 * \param num_of_neurons_per_layer_array Number of neurons in each layer
 	 * \param _num_layers Number of  layer (needs to match with array above)
 	 **/
 	FeedforwardClosedloopLearning(
-			int num_of_inputs,
-			int* num_of_neurons_per_layer_array,
-			int _num_layers
-			);
+		const int num_input,
+		const TArray<int>& num_of_neurons_per_layer
+	);
 
 	/** Destructor
-         * De-allocated any memory
-         **/
+		 * De-allocated any memory
+		 **/
 	~FeedforwardClosedloopLearning();
 
 	/** Performs the simulation step
-         * \param input Array with the input values
-         * \param error Array of the error signals
-         **/
-	void doStep(double* input, double* error);
-
-	/** Python wrapper function. Not public.
-         **/
-	void doStep(double* input, int n1, double* error, int n2);
+		 * \param input Array with the input values
+		 * \param error Array of the error signals
+		 **/
+	void doStep(const TArray<double>& input, const TArray<double>& error);
 
 	/** Gets the output from one of the output neurons
-         * \param index: The index number of the output neuron.
-         * \return The output value of the output neuron.
-         **/
+		 * \param index: The index number of the output neuron.
+		 * \return The output value of the output neuron.
+		 **/
 	double getOutput(int index) {
-		return layers[num_layers-1]->getOutput(index);
+		return layers[n_neurons_per_layer.Num() - 1]->getOutput(index);
 	}
 
 	/** Sets globally the learning rate
-         * \param learningRate Sets the learning rate for all layers and neurons.
-         **/
+		 * \param learningRate Sets the learning rate for all layers and neurons.
+		 **/
 	void setLearningRate(double learningRate);
 
 	/** Sets how the learnign rate increases or decreases from layer to layer
-         * \param _learningRateDiscountFactor A factor of >1 means higher learning rate in deeper layers.
-         **/
+		 * \param _learningRateDiscountFactor A factor of >1 means higher learning rate in deeper layers.
+		 **/
 	void setLearningRateDiscountFactor(double _learningRateDiscountFactor) {
 		learningRateDiscountFactor = _learningRateDiscountFactor;
 	}
 
 	/** Sets a typical weight decay scaled with the learning rate
-         * \param decay The larger the faster the decay.
-         **/
+		 * \param decay The larger the faster the decay.
+		 **/
 	void setDecay(double decay);
 
 	/** Sets the global momentum for all layers
-         * \param momentum Defines the intertia of the weight change over time.
-         **/
+		 * \param momentum Defines the intertia of the weight change over time.
+		 **/
 	void setMomentum(double momentum);
 
 	/** Sets the activation function of the Neuron
-         * \param _activationFunction: See Neuron::ActivationFunction for the different options.
-         **/
+		 **/
 	void setActivationFunction(FCLNeuron::ActivationFunction _activationFunction);
 
 	/** Inits the weights in all layers
-         * \param max Maximum value of the weights.
-         * \param initBias If the bias also should be initialised.
-         * \param weightInitMethod See Neuron::WeightInitMethod for the options.
-         **/
+		 * \param max Maximum value of the weights.
+		 * \param initBias If the bias also should be initialised.
+		 * \param weightInitMethod See Neuron::WeightInitMethod for the options.
+		 **/
 	void initWeights(double max = 0.001,
-			 int initBias = 1,
-			 FCLNeuron::WeightInitMethod weightInitMethod = FCLNeuron::MAX_OUTPUT_RANDOM);
+		int initBias = 1,
+		FCLNeuron::WeightInitMethod weightInitMethod = FCLNeuron::MAX_OUTPUT_RANDOM);
 
 	/** Seeds the random number generator
-         * \param s An arbitratry number.
-         **/
+		 * \param s An arbitratry number.
+		 **/
 	void seedRandom(int s) { srand(s); };
 
 	/** Sets globally the bias
-         * \param _bias Sets globally the bias input to all neurons.
-         **/
+		 * \param _bias Sets globally the bias input to all neurons.
+		 **/
 	void setBias(double _bias);
 
 	/** Gets the total number of layers
-         * \return The total number of all layers.
-         **/
-	int getNumLayers() {return num_layers;};
+		 * \return The total number of all layers.
+		 **/
+	int getNumLayers() { return (int)n_neurons_per_layer.Num(); };
 
 	/** Gets a pointer to a layer
-         * \param i Index of the layer.
-         * \return A pointer to a layer class.
-         **/
-	FCLLayer* getLayer(int i) {assert (i<=num_layers); return layers[i];};
+		 * \param i Index of the layer.
+		 * \return A pointer to a layer class.
+		 **/
+	FCLLayer* getLayer(unsigned i) { assert(i <= n_neurons_per_layer..Num()); return layers[i]; };
 
 	/** Gets the output layer
-         * \return A pointer to the output layer which is also a Layer class.
-         **/
-	FCLLayer* getOutputLayer() {return layers[num_layers-1];};
+		 * \return A pointer to the output layer which is also a Layer class.
+		 **/
+	FCLLayer* getOutputLayer() { return layers[n_neurons_per_layer.Num() - 1]; };
 
 	/** Gets the number of inputs
 	 * \return The number of inputs
 	 **/
-	int getNumInputs() {return ni;}
+	int getNumInputs() { return ni; }
 
 	/** Returns all Layers
-         * \return Returns a two dimensional array of all layers.
-         **/
-	FCLLayer** getLayers() {return layers;};
+		 * \return Returns a two dimensional array of all layers.
+		 **/
+	FCLLayer** getLayers() { return layers; };
 
 	/** Saves the whole network
-         * \param name: filename
-         **/
+		 * \param name: filename
+		 **/
 	bool saveModel(const char* name);
 
 	/** Loads the while network
-         * \param name: filename
-         **/
+		 * \param name: filename
+		 **/
 	bool loadModel(const char* name);
 
-	
+
 
 private:
-	int ni;
-	int* n;
-	int num_layers;
+	unsigned ni;
+	TArray<int> n_neurons_per_layer;
 
 	double learningRateDiscountFactor = 1;
 

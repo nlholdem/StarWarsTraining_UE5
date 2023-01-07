@@ -5,7 +5,7 @@
  * GNU GENERAL PUBLIC LICENSE
  * Version 3, 29 June 2007
  *
- * (C) 2017, Bernd Porr <bernd@glasgowneuro.tech>
+ * (C) 2017-2022, Bernd Porr <bernd@glasgowneuro.tech>
  * (C) 2017, Paul Miller <paul@glasgowneuro.tech>
  **/
 
@@ -14,146 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef __linux__
-#include <pthread.h>
-#endif
-
-#ifdef _WIN32
-#include "Windows/MinWindows.h"
-#endif
-
-
-#define NUM_THREADS 12
-
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 
-// abstract thread which contains the inner workings of the thread model
-class LayerThread {
-
-protected:
-
-	FCLNeuron** neurons;
-	int nNeurons = 0;
-	int maxNeurons = 0;
-
-#ifdef __linux__
-	pthread_t id = 0;
-#endif
-
-#ifdef _WIN32
-	DWORD id = 0;
-	HANDLE hThread = 0;
-#endif
-
-#ifdef __linux__
-	static void *exec(void *thr) {
-		reinterpret_cast<LayerThread *> (thr)->run();
-		return NULL;
-	}
-#endif
-
-#ifdef _WIN32
-	static DWORD WINAPI exec(LPVOID thr) {
-		reinterpret_cast<LayerThread *> (thr)->run();
-		return 0;
-	}
-#endif
-
-
-public:
-
-	LayerThread(int _maxNeurons) {
-		maxNeurons = _maxNeurons;
-		neurons = new FCLNeuron*[maxNeurons];
-	}
-
-	virtual ~LayerThread() {
-#ifdef _WIN32
-		CloseHandle(hThread);
-#endif
-		delete [] neurons;
-	}
-	
-	void addNeuron(FCLNeuron* neuron) {
-		if (nNeurons >= maxNeurons) {
-			fprintf(stderr,"Not enough memory for threads.\n");
-			exit(1);
-		}
-		neurons[nNeurons] = neuron;
-		nNeurons++;
-	}
-
-	void start() {
-		if (nNeurons == 0) {
-			return;
-		}
-#ifdef __linux__
-		int ret;
-		if ((ret = pthread_create(&id, NULL, &LayerThread::exec, this)) != 0) {
-			fprintf(stderr,"%s\n",strerror(ret)); 
-			abort();
-		}
-#endif
-#ifdef _WIN32
-		hThread = CreateThread(
-			NULL,                   // default security attributes
-			0,                      // use default stack size  
-			&LayerThread::exec,     // thread function name
-			this,                   // argument to thread function 
-			0,                      // use default creation flags 
-			&id);   // returns the thread identifier 
-		if (hThread == NULL) {
-			ExitProcess(3);
-		}
-#endif
-	}
-
-	void join() {
-		if (nNeurons == 0) {
-			return;
-		}
-#ifdef __linux__
-		pthread_join(id,NULL);
-#endif
-#ifdef _WIN32
-		WaitForSingleObject(hThread, INFINITE);
-#endif
-	}
-
-	// is implemented by its children to do the specfic task the thread
-	virtual void run() = 0;
-	
-};
-
-
-class CalcOutputThread : public LayerThread {
-	using LayerThread::LayerThread;
-	void run() {
-		for (int i=0;i<nNeurons;i++) {
-			neurons[i]->calcOutput();
-		}
-	}
-};
-
-
-class LearningThread : public LayerThread {
-	using LayerThread::LayerThread;
-	void run() {
-		for (int i=0;i<nNeurons;i++) {
-			neurons[i]->doLearning();
-		}
-	}
-};
-
-
-class MaxDetThread : public LayerThread {
-	using LayerThread::LayerThread;
-	void run() {
-		for (int i=0;i<nNeurons;i++) {
-			neurons[i]->doMaxDet();
-		}
-	}
-};
 
 
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
@@ -279,6 +141,12 @@ public:
 		return neurons[index]->getOutput();
 	}
 
+	void addNeuron(FCLNeuron* neuron) {
+		neurons[nNeurons] = neuron;
+		nNeurons++;
+	}
+
+
 	/** Gets a pointer to one neuron
          * \param index The index number of the neuron.
          * \return A pointer to a Layer class.
@@ -360,10 +228,7 @@ private:
 	// for debugging output
 	int layerIndex = 0;
 	long int step = 0;
-	int useThreads = 1;
-	CalcOutputThread** calcOutputThread = NULL;
-	LearningThread** learningThread = NULL;
-	MaxDetThread** maxDetThread = NULL;
+	int useThreads = 0;
 };
 
 #endif

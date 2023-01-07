@@ -19,24 +19,13 @@ FCLLayer::FCLLayer(int _nNeurons, int _nInputs) {
 	nInputs = _nInputs;
 	normaliseWeights = WEIGHT_NORM_NONE;
 
-	neurons = new FCLNeuron*[nNeurons];
+	neurons = new FCLNeuron*[_nNeurons];
 
-	calcOutputThread = new CalcOutputThread*[NUM_THREADS];
-	learningThread = new LearningThread*[NUM_THREADS];
-	maxDetThread = new MaxDetThread*[NUM_THREADS];
 
-	int neuronsPerThread = nNeurons/NUM_THREADS+1;
-	for(int i=0;i<NUM_THREADS;i++) {
-		calcOutputThread[i] = new CalcOutputThread(neuronsPerThread);
-		learningThread[i] = new LearningThread(neuronsPerThread);
-		maxDetThread[i] = new MaxDetThread(neuronsPerThread);
-	}
 
-	for(int i=0;i<nNeurons;i++) {
+	for(int i=0;i<_nNeurons;i++) {
 		neurons[i] = new FCLNeuron(nInputs);
-		calcOutputThread[i%NUM_THREADS]->addNeuron(neurons[i]);
-		learningThread[i%NUM_THREADS]->addNeuron(neurons[i]);
-		maxDetThread[i%NUM_THREADS]->addNeuron(neurons[i]);
+//		this->addNeuron(neurons[i]);
 	}
 
 	initWeights(0,0,FCLNeuron::CONST_WEIGHTS);
@@ -49,33 +38,13 @@ FCLLayer::~FCLLayer() {
 	}
 	delete [] neurons;
 
-	for(int i=0;i<NUM_THREADS;i++) {
-		delete calcOutputThread[i];
-		delete learningThread[i];
-		delete maxDetThread[i];
-	}
-
-	delete [] calcOutputThread;
-	delete [] learningThread;
-	delete [] maxDetThread;
-	
 }
 
 void FCLLayer::calcOutputs() {
-	if (useThreads) {
-		//fprintf(stderr,"+");
-		for(int i=0;i<NUM_THREADS;i++) {
-			calcOutputThread[i]->start();
-		}
-		for(int i=0;i<NUM_THREADS;i++) {
-			calcOutputThread[i]->join();
-		}
-	} else {
 		//fprintf(stderr,"-");
 		for (int i = 0; i<nNeurons; i++) {
 			neurons[i]->calcOutput();
 		}
-	}
 }
 
 void FCLLayer::doNormaliseWeights() {
@@ -131,27 +100,7 @@ void FCLLayer::doNormaliseWeights() {
 }
 
 void FCLLayer::doLearning() {
-	if (useThreads) {
-		if (maxDetLayer) {
-			for(int i=0;i<NUM_THREADS;i++) {
-				maxDetThread[i]->start();
-			}
-		} else {
-			//fprintf(stderr,"*");
-			for(int i=0;i<NUM_THREADS;i++) {
-				learningThread[i]->start();
-			}
-		}
-		if (maxDetLayer) {
-			for(int i=0;i<NUM_THREADS;i++) {
-				maxDetThread[i]->join();
-			}
-		} else {
-			for(int i=0;i<NUM_THREADS;i++) {
-				learningThread[i]->join();
-			}
-		}
-	} else {
+
 		if (maxDetLayer) {
 			for (int i = 0; i<nNeurons; i++) {
 				neurons[i]->doMaxDet();
@@ -163,7 +112,6 @@ void FCLLayer::doLearning() {
 				neurons[i]->doLearning();
 			}
 		}
-	}
 	doNormaliseWeights();
 }
 
@@ -184,9 +132,6 @@ void FCLLayer::setError(double _error) {
 
 void FCLLayer::setErrors( double* _errors) {
 	for(int i=0;i<nNeurons;i++) {
-		if (isnan(_errors[i])) {
-			fprintf(stderr,"Layer::%s L=%d, errors[%d]=%f\n",__func__,layerIndex,i,_errors[i]);
-		}
 		neurons[i]->setError(_errors[i]);
 	}
 }
@@ -309,14 +254,5 @@ void FCLLayer::setConvolution( int width,  int height) {
 
 
 int FCLLayer::saveWeightMatrix(char *filename) {
-	FILE* f = fopen(filename,"wt");
-	if (!f) return errno;
-	for(int i=0;i<nNeurons;i++) {
-		for(int j=0;j<neurons[i]->getNinputs();j++) {
-			fprintf(f,"%f\t",neurons[i]->getWeight(j));
-		}
-		fprintf(f,"\n");
-	}
-	fclose(f);
 	return 0;
 }

@@ -12,7 +12,7 @@ PIDController::PIDController(double _min, double _max, double _Kp, double _Kd, d
 	Ki = _Ki;
 	error_old = 0.0;
 	integral = 0.0;
-	UE_LOG(LogTemp, Warning, TEXT("Constructing PIDController... "));
+	UE_LOG(LogTemp, Warning, TEXT("Constructing PIDController... Kp %f Kd %f Ki %f "), Kp, Kd, Ki);
 
 }
 
@@ -26,7 +26,6 @@ double PIDController::update(double setpoint, double state, double dt)
 
     // Calculate error
     double error = setpoint - state;
-
 
     // Proportional term
     double Pout = Kp * error;
@@ -50,7 +49,7 @@ double PIDController::update(double setpoint, double state, double dt)
 
     // Save error to previous error
     error_old = error;
-    //    UE_LOG(LogTemp, Warning, TEXT("CONTROLLER......  setpt %f state %f err %f out %f"), setpoint, state, error, output);
+//    UE_LOG(LogTemp, Warning, TEXT("CONTROLLER......  setpt %f state %f err %f out %f"), setpoint, state, error, output);
 
     return output;
 }

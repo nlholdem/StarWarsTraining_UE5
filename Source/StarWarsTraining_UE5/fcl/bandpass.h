@@ -17,7 +17,7 @@ public:
 	 * Constructor
 	 **/
 	FCLBandpass();
-	
+
 	/**
 	 * Filter
 	 **/
@@ -27,7 +27,7 @@ public:
 	 * Calculates the coefficients
 	 * The frequency is the normalized frequency in the range [0..0.5].
 	 **/
-	void calcPolesZeros(double f,double r);
+	void calcPolesZeros(double f, double r);
 
 	/**
 	 * sets the filter parameters
@@ -40,8 +40,8 @@ public:
 	void impulse(char* name);
 
 	/**
-         * Normalises the output with f
-         **/
+		 * Normalises the output with f
+		 **/
 	void calcNorm(double f);
 
 	/**
@@ -53,7 +53,7 @@ public:
 	 * Gets the output of the filter. Same as the return value
 	 * of the function "filter()".
 	 **/
-	inline double getOutput() {return actualOutput;};
+	inline double getOutput() { return actualOutput; };
 
 	/**
 	 * Sets the output to zero again
