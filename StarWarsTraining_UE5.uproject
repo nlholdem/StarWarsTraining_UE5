@@ -35,12 +35,19 @@
 				"Win64",
 				"Android"
 			]
+		},
+		{
+			"Name": "Bridge",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
 		}
 	],
 	"TargetPlatforms": [
 		"Android",
-		"IOS",
-		"Linux",
 		"Mac",
 		"PS4",
 		"PS5",
@@ -48,7 +55,6 @@
 		"WindowsNoEditor",
 		"Switch",
 		"XboxOne",
-		"XSX",
-		"HoloLens"
+		"XSX"
 	]
 }
