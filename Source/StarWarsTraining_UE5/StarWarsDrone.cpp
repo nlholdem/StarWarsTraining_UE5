@@ -8,20 +8,20 @@ AStarWarsDrone::AStarWarsDrone()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+/*
 	CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
 	CollisionBox->SetupAttachment(RootComponent);
 	CollisionBox->SetCollisionProfileName("OverlapAll");
 	CollisionBox->SetNotifyRigidBodyCollision(true);
 	CollisionBox->SetHiddenInGame(false);
-
-/*
-	CollisionSphere= CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
-	CollisionSphere->SetupAttachment(RootComponent);
-	CollisionSphere->SetCollisionProfileName("OverlapAll");
-	CollisionSphere->SetNotifyRigidBodyCollision(true);
-	CollisionSphere->SetHiddenInGame(false);
 	*/
+
+	CollisionBall = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionBall"));
+	CollisionBall->SetupAttachment(RootComponent);
+	CollisionBall->SetCollisionProfileName("OverlapAll");
+	CollisionBall->SetNotifyRigidBodyCollision(true);
+	CollisionBall->SetHiddenInGame(false);
+
 	UE_LOG(LogTemp, Warning, TEXT("Constructing a Drone"))
 
 }
@@ -32,9 +32,14 @@ void AStarWarsDrone::BeginPlay()
 	Super::BeginPlay();
 	// attach collision components to sockets based on transformations definitions
 	const FAttachmentTransformRules AttachmentRules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::KeepWorld, false);
+/*
 	CollisionBox->AttachToComponent(RootComponent, AttachmentRules, "SphereCollisionSocket");
 	CollisionBox->OnComponentHit.AddDynamic(this, &AStarWarsDrone::OnAttackHit);
 	CollisionBox->OnComponentBeginOverlap.AddDynamic(this, &AStarWarsDrone::OnOverlapBegin);
+*/
+	CollisionBall->AttachToComponent(RootComponent, AttachmentRules, "SphereCollisionSocket");
+	CollisionBall->OnComponentHit.AddDynamic(this, &AStarWarsDrone::OnAttackHit);
+	CollisionBall->OnComponentBeginOverlap.AddDynamic(this, &AStarWarsDrone::OnOverlapBegin);
 
 	XController = new PIDController(-100.0, 100.0, Kp, Kd, Ki);
 	YController = new PIDController(-100.0, 100.0, Kp, Kd, Ki);
@@ -47,12 +52,12 @@ void AStarWarsDrone::BeginPlay()
 	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AStarWarsDrone::OnOverlapBegin);
 	*/
 	// FCL learning network
-	TArray<int> nNeur = { 3,3 };
+	TArray<int> nNeur = { 2,2 };
 	fcl = new FeedforwardClosedloopLearning(4, nNeur);
 	UE_LOG(LogTemp, Warning, TEXT("Num layers: %d"), fcl->getNumLayers())
-	fcl->setLearningRate(0.3);
+	fcl->setLearningRate(0.01);
 	fcl->initWeights(1, 0, FCLNeuron::MAX_OUTPUT_RANDOM);
-	fcl->setLearningRateDiscountFactor(1);
+	fcl->setLearningRateDiscountFactor(1.0);
 	fcl->setBias(0);
 	UE_LOG(LogTemp, Warning, TEXT("Constructing FCL"))
 	RootMeshComponent = Cast<UStaticMeshComponent>(RootComponent);
@@ -65,11 +70,11 @@ void AStarWarsDrone::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	FVector EnemyLocation = Enemy->GetActorLocation();
 	FRotator EnemyRotation = Enemy->GetActorRotation();
-	FVector NewLocation = GetActorLocation();
-	FRotator NewRotation = GetActorRotation();
+	FVector DroneLocation = GetActorLocation();
+	FRotator DroneRotation = GetActorRotation();
 
 	// getting the angle betweeen drone and gun
-	FVector d = NewLocation - EnemyLocation;
+	FVector d = DroneLocation - EnemyLocation;
 	float a = atan2f(d.Y, d.X);
 	a = 360.0 * a / (2.0 * PI);
 	a = fmod(a, 360.0);
@@ -85,27 +90,39 @@ void AStarWarsDrone::Tick(float DeltaTime)
 	float sin_drone_actor_angle_roll = sin(2 * PI * drone_actor_angle_roll / 360.0);
 	// hopefully that's zero if the gun is pointing at the drone?
 
-	float XOutput = XController->update(890.0, NewLocation.X, DeltaTime);
-	float YOutput = YController->update(0.0, NewLocation.Y, DeltaTime);
-	float ZOutput = ZController->update(100.0, NewLocation.Z, DeltaTime);
+	float XOutput = XController->update(890.0, DroneLocation.X, DeltaTime);
+	float YOutput = YController->update(0.0, DroneLocation.Y, DeltaTime);
+	float ZOutput = ZController->update(100.0, DroneLocation.Z, DeltaTime);
 
 //	UE_LOG(LogTemp, Warning, TEXT("Aiming Angle Yaw: %f  Roll: %f"), drone_actor_angle_yaw, drone_actor_angle_roll);
 //	UE_LOG(LogTemp, Warning, TEXT("Yaw: %f Angle: %f Enemy: %f"), drone_actor_angle_yaw, a, EnemyRotation.Yaw);
-	UE_LOG(LogTemp, Warning, TEXT("Cos Yaw: %f Sin Yaw: %f "), cos_drone_actor_angle_yaw, sin_drone_actor_angle_yaw);
+//	UE_LOG(LogTemp, Warning, TEXT("Cos Yaw: %f Sin Yaw: %f "), cos_drone_actor_angle_yaw, sin_drone_actor_angle_yaw);
 
-	TArray<double> input = { cos_drone_actor_angle_yaw, cos_drone_actor_angle_roll, sin_drone_actor_angle_yaw, sin_drone_actor_angle_roll };
-	TArray<double> error = { Flinch.X, Flinch.Y, Flinch.Z };
+	Flinch = 0.0;
+// Simulate the same learning task as the LineFollower: imagine two rays at +30 degrees and -30 from where the pistol is pointing. These are the 
+	// edges of the 'road'. If the drone is outside these boundaries, it receives an impulse to push it back towards where the pistol points. 
+	if (sin_drone_actor_angle_yaw < -0.5)
+		Flinch = -1.0;
+	if (sin_drone_actor_angle_yaw > 0.5)
+		Flinch = 1.0;
+
+	input = { cos_drone_actor_angle_yaw, cos_drone_actor_angle_roll, sin_drone_actor_angle_yaw, sin_drone_actor_angle_roll };
+	error = { Flinch, Flinch, Flinch, Flinch };
 	fcl->doStep(input, error);
-	Flinch.X = 0.0;
-	Flinch.Y = 0.0;
-	Flinch.Z = 0.0;
-	Gain = 10000.0;
-//	UE_LOG(LogTemp, Warning, TEXT("Net Output: %f"), fcl->getOutputLayer()->getNeuron(0)->getOutput());
-//	UE_LOG(LogTemp, Warning, TEXT("Force: %f %f %f"), XGain * XOutput, YGain * YOutput, ZGain * ZOutput);
+	UE_LOG(LogTemp, Warning, TEXT("%f %f %f %f %f %f"), cos_drone_actor_angle_yaw, cos_drone_actor_angle_roll,
+		sin_drone_actor_angle_yaw, sin_drone_actor_angle_roll, Flinch, fcl->getOutputLayer()->getNeuron(0)->getOutput());
+
+	FRotator NetAngle = FRotator(0.0, -90.0, 0.0);
+	FVector NetVector = NetAngle.RotateVector(d);
+	NetVector /= NetVector.Size();
+	FVector FlinchVector = FVector(NetVector);
+	NetVector *= Gain * (fcl->getOutputLayer()->getNeuron(0)->getOutput());
+	FlinchVector *= Flinch * DodgeGain;
+	NetVector += FlinchVector;
 	RootMeshComponent->AddImpulse(FVector(
-		XGain * XOutput + Gain * (fcl->getOutputLayer()->getNeuron(0)->getOutput()), 
-		YGain * YOutput + Gain * (fcl->getOutputLayer()->getNeuron(1)->getOutput()), 
-		ZGain * ZOutput + Gain * (fcl->getOutputLayer()->getNeuron(2)->getOutput())
+		XGain * XOutput + NetVector.X, 
+		YGain * YOutput + NetVector.Y,
+		ZGain * ZOutput
 			));
 
 //	NewLocation.X += XOutput;// +Gain * (fcl->getOutputLayer()->getNeuron(0)->getOutput());
@@ -138,7 +155,6 @@ void AStarWarsDrone::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 		FVector RelativeImpactPoint = SweepResult.ImpactPoint - MyLocation;
 		FVector Diff = MyLocation - OtherActorLocation;
 		FRotator ImpactDirection = Diff.Rotation();
-		double DodgeGain = 100000.0;
 		GEngine->AddOnScreenDebugMessage(INDEX_NONE, 5.f, FColor::Black, TEXT("Ouch!!"));
 		FRotator BulletRotation = OtherActor->GetActorRotation();
 		FVector BulletDirection = BulletRotation.Vector();
@@ -149,65 +165,29 @@ void AStarWarsDrone::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor*
 		float angle = atan2(DetVectors, DotVectors);
 //		UE_LOG(LogTemp, Warning, TEXT("Bullet: Yaw: %f Roll: %f Pitch: %f"), BulletRotation.Yaw, BulletRotation.Pitch, BulletRotation.Roll);
 //		UE_LOG(LogTemp, Warning, TEXT("Impact: Yaw: %f Roll: %f Pitch: %f"), ImpactDirection.Yaw, ImpactDirection.Pitch, ImpactDirection.Roll);
-		UE_LOG(LogTemp, Warning, TEXT("Cos Theta: %f Sin Theta: %f"), cos(angle), sin(angle));
-		FVector FlinchAngle;
-		if (sin(angle) > 0.0)
-			FlinchAngle = FVector(0.0, 1.0, 0.0);
-		else
-			FlinchAngle = FVector(0.0, -1.0, 0.0);
+//		UE_LOG(LogTemp, Warning, TEXT("Cos Theta: %f Sin Theta: %f"), cos(angle), sin(angle));
+		FRotator FlinchAngle;
+/*		if (sin(angle) > 0.0) {
+			FlinchAngle = FRotator(0.0, -90.0, 0.0);
+			Flinch = -1.0;
+		}
+		else {
+			FlinchAngle = FRotator(0.0, 90.0, 0.0);
+			Flinch = 1.0;
+		}
+		*/
+//		UE_LOG(LogTemp, Warning, TEXT("Bullet Direction: X: %f Y: %f Z: %f"), BulletRotation.Vector().X, BulletRotation.Vector().Y, BulletRotation.Vector().Z);
+		FVector FlinchVector = FlinchAngle.RotateVector(BulletDirection);
 
-		Flinch = BulletRotation.RotateVector(FlinchAngle);
-//		UE_LOG(LogTemp, Warning, TEXT("Flinch: X: %f Y: %f Z: %f"), Flinch.X, Flinch.Y, Flinch.Z);
+		//		UE_LOG(LogTemp, Warning, TEXT("Flinch: X: %f Y: %f Z: %f"), Flinch.X, Flinch.Y, Flinch.Z);
 
-		RootMeshComponent->AddImpulse(DodgeGain * Flinch);
+//		RootMeshComponent->AddImpulse(DodgeGain * FlinchVector);
 
 		/*		
 		UE_LOG(LogTemp, Warning, TEXT("Vector: %f %f %f"), Diff.X, Diff.Y, Diff.Z);
 		UE_LOG(LogTemp, Warning, TEXT("Impact Vector: %f %f %f"), RelativeImpactPoint.X, RelativeImpactPoint.Y, RelativeImpactPoint.Z);
 		UE_LOG(LogTemp, Warning, TEXT("Impact Vector: %f %f %f"), RelativeImpactPoint.X, RelativeImpactPoint.Y, RelativeImpactPoint.Z);
 	*/
-		if (RelativeImpactPoint.X > 0)
-		{
-//			NewLocation.X -= 10.0;
-//			UE_LOG(LogTemp, Warning, TEXT("BACK"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(1.0f, 0.0f, 0.0f));
-		}
-		else
-		{
-//			NewLocation.X += 10.0;
-//			UE_LOG(LogTemp, Warning, TEXT("FORWARD"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(-1.0f, 0.0f, 0.0f));
-		}
-		if (RelativeImpactPoint.Y > 0)
-		{
-//			NewLocation.Y -= 10.0;
-//			UE_LOG(LogTemp, Warning, TEXT("LEFT"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(0.0f, 1.0f, 0.0f));
-		}
-		else
-		{
-//			NewLocation.Y += 10.0;
-///			UE_LOG(LogTemp, Warning, TEXT("RIGHT"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(0.0f, -1.0f, 0.0f));
-		}
-		if (RelativeImpactPoint.Z > 0)
-		{
-//			NewLocation.Z -= 10.0;
-//			UE_LOG(LogTemp, Warning, TEXT("UP"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(0.0f, 0.0f, 1.0f));
-		}
-		else
-		{
-	//		NewLocation.Z += 10.0;
-//			UE_LOG(LogTemp, Warning, TEXT("DOWN"));
-//			RootMeshComponent->AddImpulse(DodgeGain * FVector(0.0f, 0.0f, -1.0f));
-		}
-		/*
-		NewLocation.X = -60.0;
-		NewLocation.Y = 0.0;
-		NewLocation.Z = 50.0;
-		SetActorLocation(NewLocation);
-		*/
 	}
 
 }

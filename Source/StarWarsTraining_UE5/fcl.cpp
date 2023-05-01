@@ -84,6 +84,9 @@ void FeedforwardClosedloopLearning::doStep(const TArray<double>& input, const TA
 #endif
 		throw tmp;
 	}*/
+	assert(input.Num() == ni);
+	assert(error.Num() == ni);
+
 	// we set the input to the input layer
 	layers[0]->setInputs((double *) input.GetData());
 	// ..and calc its output

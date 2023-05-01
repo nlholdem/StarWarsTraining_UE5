@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
@@ -23,6 +24,9 @@ class STARWARSTRAINING_UE5_API AStarWarsDrone : public AActor
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collision, meta = (AllowPrivateAccess = "true"))
 		class UBoxComponent* CollisionBox;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Collision, meta = (AllowPrivateAccess = "true"))
+		class USphereComponent* CollisionBall;
+
 	UPROPERTY(EditAnywhere)
 		double Kp;
 
@@ -34,6 +38,9 @@ class STARWARSTRAINING_UE5_API AStarWarsDrone : public AActor
 
 	UPROPERTY(EditAnywhere)
 		double Gain;
+
+	UPROPERTY(EditAnywhere)
+		double DodgeGain;
 
 public:
 	// Sets default values for this actor's properties
@@ -55,7 +62,9 @@ private:
 	float XGain = 100.0;
 	float YGain = 100.0;
 	float ZGain = 100.0;
-	FVector Flinch = FVector(0, 0, 0);
+	float Flinch = 0.0;
+	TArray<double> input = { 0.0, 0.0, 0.0, 0.0 };
+	TArray<double> error = { 0.0, 0.0, 0.0, 0.0 };
 
 	FeedforwardClosedloopLearning* fcl;
 	UStaticMeshComponent* RootMeshComponent;
